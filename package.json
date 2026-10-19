@@ -1,0 +1,11 @@
+{
+  "name": "prompt-notebook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ComfyUI / Animagine XL 4.0 向けプロンプト帳 (静的PWA)",
+  "scripts": {
+    "test": "node --test tests/",
+    "start": "python3 -m http.server 8080"
+  }
+}

@@ -1,0 +1,58 @@
+/* Service Worker — cache-first + バックグラウンド更新 */
+const CACHE_VERSION = 'prompt-notebook-v1';
+const ASSETS = [
+  './',
+  './index.html',
+  './styles.css',
+  './manifest.webmanifest',
+  './js/app.js',
+  './js/db.js',
+  './js/logic.js',
+  './js/tags.js',
+  './js/icons.js',
+  './js/sound.js',
+  './js/bg.js',
+  './icons/logo.svg',
+  './icons/icon.svg',
+  './icons/icon-maskable.svg',
+  './icons/favicon.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/apple-touch-icon.png',
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_VERSION).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()),
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))),
+    ).then(() => self.clients.claim()),
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  event.respondWith(
+    caches.open(CACHE_VERSION).then(async (cache) => {
+      const cached = await cache.match(request, { ignoreSearch: true });
+      const network = fetch(request)
+        .then((response) => {
+          if (response && response.ok) {
+            cache.put(request, response.clone());
+          }
+          return response;
+        })
+        .catch(() => cached);
+      return cached || network;
+    }),
+  );
+});
