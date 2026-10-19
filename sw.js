@@ -1,5 +1,5 @@
 /* Service Worker — cache-first + バックグラウンド更新 */
-const CACHE_VERSION = 'prompt-notebook-v1';
+const CACHE_VERSION = 'prompt-notebook-v3';
 const ASSETS = [
   './',
   './index.html',

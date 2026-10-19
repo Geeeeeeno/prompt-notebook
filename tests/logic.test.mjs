@@ -11,6 +11,8 @@ import {
   normalizePromptText,
   formatWeightedTag,
   adjustTagWeight,
+  hashString,
+  promptArtColors,
   APP_ID,
   ANIMAGINE_NEGATIVE,
 } from '../js/logic.js';
@@ -224,6 +226,26 @@ describe('export / validateImport / mergeImport', () => {
     assert.equal(prompts.length, 2);
     assert.equal(stats.duplicated, 1);
     assert.ok(prompts.some((p) => p.id !== 'a1'));
+  });
+});
+
+describe('hashString / promptArtColors', () => {
+  it('同じ文字列なら同じハッシュになる', () => {
+    assert.equal(hashString('1girl, sakura'), hashString('1girl, sakura'));
+  });
+
+  it('異なる文字列で色相が変わりうる', () => {
+    const a = promptArtColors('night sakura');
+    const b = promptArtColors('neon city');
+    assert.ok(a.hue >= 0 && a.hue < 360);
+    assert.ok(b.hue >= 0 && b.hue < 360);
+    assert.ok(a.hue !== b.hue || a.hue2 !== b.hue2);
+  });
+
+  it('空文字でも色を返す', () => {
+    const c = promptArtColors('');
+    assert.equal(typeof c.sat, 'number');
+    assert.equal(typeof c.light, 'number');
   });
 });
 

@@ -6,6 +6,35 @@
 export const APP_ID = 'prompt-notebook';
 export const APP_VERSION = 1;
 
+/**
+ * FNV-1a 風の文字列ハッシュ（UI アートの色相決定用）
+ * @param {string} str
+ * @returns {number} 0..2^32-1
+ */
+export function hashString(str) {
+  let h = 2166136261;
+  const s = String(str ?? '');
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/**
+ * プロンプト内容からサムネ用グラデーション色を決める
+ * @param {string} text
+ * @returns {{ hue: number, hue2: number, sat: number, light: number }}
+ */
+export function promptArtColors(text) {
+  const h = hashString(text || 'empty');
+  const hue = h % 360;
+  const hue2 = (hue + 48 + ((h >>> 9) % 40)) % 360;
+  const sat = 48 + ((h >>> 17) % 22);
+  const light = 42 + ((h >>> 23) % 14);
+  return { hue, hue2, sat, light };
+}
+
 export const QUALITY_TAGS = new Set([
   'masterpiece',
   'best quality',

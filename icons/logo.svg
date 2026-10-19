@@ -1,15 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
   <defs>
-    <linearGradient id="g" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+    <linearGradient id="g" x1="6" y1="8" x2="58" y2="56" gradientUnits="userSpaceOnUse">
       <stop stop-color="#9ae6ff"/>
-      <stop offset="0.55" stop-color="#f6a6c8"/>
+      <stop offset="0.5" stop-color="#f6a6c8"/>
       <stop offset="1" stop-color="#c4a0ff"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="40" y1="18" x2="54" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff6c8"/>
+      <stop offset="1" stop-color="#f6a6c8"/>
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="#12162a"/>
-  <rect x="10" y="12" width="34" height="42" rx="5" stroke="url(#g)" stroke-width="2.2" fill="rgba(154,230,255,0.08)"/>
-  <path d="M18 22h18M18 30h14M18 38h16" stroke="url(#g)" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
-  <path d="M40 40l10-18 4 2-10 18-4.5.8L40 40z" fill="url(#g)" opacity="0.95"/>
-  <path d="M48 20l1.2 2.6 2.6 1.2-2.6 1.2L48 27.6l-1.2-2.6-2.6-1.2 2.6-1.2L48 20z" fill="#fff6c8"/>
-  <path d="M54 12l.8 1.7 1.7.8-1.7.8L54 17l-.8-1.7-1.7-.8 1.7-.8L54 12z" fill="#9ae6ff" opacity="0.9"/>
+  <path d="M10 14c0-2 1.4-3.5 3.4-3.5H30v42.5H13.4C11.4 53 10 51.5 10 49.5V14z" fill="rgba(154,230,255,0.1)" stroke="url(#g)" stroke-width="2"/>
+  <path d="M54 14c0-2-1.4-3.5-3.4-3.5H34v42.5h16.6c2 0 3.4-1.5 3.4-3.5V14z" fill="rgba(246,166,200,0.1)" stroke="url(#g)" stroke-width="2"/>
+  <path d="M32 10.5v42.5" stroke="url(#g)" stroke-width="1.6" opacity="0.7"/>
+  <path d="M15 22h12M15 29h10M15 36h11" stroke="url(#g)" stroke-width="1.7" stroke-linecap="round" opacity="0.75"/>
+  <path d="M37 22h12M37 29h10M37 36h11" stroke="url(#g)" stroke-width="1.7" stroke-linecap="round" opacity="0.55"/>
+  <path d="M42 44l9-16 3.2 1.8-9 16-4 .7 0.8-2.5z" fill="url(#ink)" opacity="0.95"/>
+  <path d="M51 28.2l2.2-3.8" stroke="#fff6c8" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M48 14l1.1 2.4 2.4 1.1-2.4 1.1L48 21l-1.1-2.4-2.4-1.1 2.4-1.1L48 14z" fill="#fff6c8"/>
+  <path d="M56 20l.7 1.5 1.5.7-1.5.7L56 24.4l-.7-1.5-1.5-.7 1.5-.7L56 20z" fill="#9ae6ff" opacity="0.95"/>
+  <path d="M18 48l.6 1.3 1.3.6-1.3.6L18 51.8l-.6-1.3-1.3-.6 1.3-.6L18 48z" fill="#c4a0ff" opacity="0.85"/>
 </svg>
