@@ -75,6 +75,13 @@ let qualityPosition = 'end';
 /** @type {BeforeInstallPromptEvent|null} */
 let deferredInstall = null;
 let openSheetId = null;
+/** @type {Map<string, ReturnType<typeof setTimeout>>} */
+const sheetHideTimers = new Map();
+/** @type {ReturnType<typeof setTimeout>|null} */
+let modalHideTimer = null;
+/** @type {Map<string, { blob: Blob, url: string }>} */
+const thumbUrlCache = new Map();
+let previewObjectUrl = null;
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -122,6 +129,17 @@ async function init() {
 
   await ensureSeedData(makeSamples);
   await reload();
+}
+
+function ensureSelectValue(select, value) {
+  const v = value == null ? '' : String(value);
+  if (v && ![...select.options].some((o) => o.value === v)) {
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v;
+    select.appendChild(opt);
+  }
+  select.value = v;
 }
 
 function fillSelects() {
@@ -197,9 +215,31 @@ function makeSamples() {
 
 async function reload() {
   prompts = await getAllPrompts();
+  syncThumbUrlCache(prompts);
   renderStats();
   renderList();
   renderTagFilters();
+}
+
+function thumbObjectUrl(prompt) {
+  const thumb = prompt?.thumbnail;
+  if (!thumb) return '';
+  if (typeof thumb === 'string') return thumb;
+  const cached = thumbUrlCache.get(prompt.id);
+  if (cached?.blob === thumb) return cached.url;
+  if (cached) URL.revokeObjectURL(cached.url);
+  const url = URL.createObjectURL(thumb);
+  thumbUrlCache.set(prompt.id, { blob: thumb, url });
+  return url;
+}
+
+function syncThumbUrlCache(list) {
+  const ids = new Set((list || []).map((p) => p.id));
+  for (const [id, cached] of thumbUrlCache) {
+    if (ids.has(id)) continue;
+    URL.revokeObjectURL(cached.url);
+    thumbUrlCache.delete(id);
+  }
 }
 
 function renderStats() {
@@ -254,11 +294,7 @@ function cardHtml(p) {
   const pad = aspectPadding(w, h);
   let mediaInner = '';
   if (p.thumbnail) {
-    const url =
-      typeof p.thumbnail === 'string'
-        ? p.thumbnail
-        : URL.createObjectURL(p.thumbnail);
-    mediaInner = `<img src="${url}" alt="" loading="lazy" />`;
+    mediaInner = `<img src="${escapeHtml(thumbObjectUrl(p))}" alt="" loading="lazy" />`;
   } else {
     const colors = promptArtColors(`${p.title || ''}|${p.positive || ''}|${p.id || ''}`);
     mediaInner = promptArtSvg(colors);
@@ -561,9 +597,31 @@ function renderTagFilters() {
   list.hidden = !$('#btn-tag-filter').classList.contains('is-on');
 }
 
+function clearSheetHideTimer(id) {
+  const timer = sheetHideTimers.get(id);
+  if (timer == null) return;
+  clearTimeout(timer);
+  sheetHideTimers.delete(id);
+}
+
+function anySheetOpen(exceptId = null) {
+  return [...$$('.sheet')].some((s) => s.id !== exceptId && s.classList.contains('is-open'));
+}
+
+function releaseOverlayIfIdle() {
+  const modal = $('#modal');
+  if (anySheetOpen() || modal.classList.contains('is-open')) return;
+  const overlay = $('#overlay');
+  overlay.classList.remove('is-open');
+  overlay.hidden = true;
+  document.body.style.overflow = '';
+  openSheetId = null;
+}
+
 function openSheet(id) {
   const sheet = document.getElementById(id);
   const overlay = $('#overlay');
+  clearSheetHideTimer(id);
   overlay.hidden = false;
   sheet.hidden = false;
   sheet.style.transform = '';
@@ -578,18 +636,19 @@ function openSheet(id) {
 function closeSheet(id) {
   const sheet = document.getElementById(id || openSheetId);
   if (!sheet) return;
+  clearSheetHideTimer(sheet.id);
   sheet.classList.remove('is-open', 'is-dragging');
   sheet.style.transform = '';
-  const overlay = $('#overlay');
-  overlay.classList.remove('is-open');
-  setTimeout(() => {
+  if (!anySheetOpen(sheet.id) && !$('#modal').classList.contains('is-open')) {
+    $('#overlay').classList.remove('is-open');
+  }
+  const timer = setTimeout(() => {
+    sheetHideTimers.delete(sheet.id);
+    if (sheet.classList.contains('is-open')) return;
     sheet.hidden = true;
-    if (![...$$('.sheet')].some((s) => s.classList.contains('is-open'))) {
-      overlay.hidden = true;
-      document.body.style.overflow = '';
-      openSheetId = null;
-    }
+    releaseOverlayIfIdle();
   }, 320);
+  sheetHideTimers.set(sheet.id, timer);
 }
 
 function closeAllSheets() {
@@ -654,8 +713,8 @@ function openEditor(prompt = null) {
   $('#f-seed').value = editing.seed ?? -1;
   $('#f-steps').value = editing.steps ?? 28;
   $('#f-cfg').value = editing.cfg ?? 5;
-  $('#f-sampler').value = editing.sampler || 'euler_ancestral';
-  $('#f-scheduler').value = editing.scheduler || 'normal';
+  ensureSelectValue($('#f-sampler'), editing.sampler || 'euler_ancestral');
+  ensureSelectValue($('#f-scheduler'), editing.scheduler || 'normal');
   $('#f-width').value = editing.width || 832;
   $('#f-height').value = editing.height || 1216;
   $('#f-memo').value = editing.memo || '';
@@ -678,11 +737,17 @@ function syncPresetSelect() {
 
 function updateThumbPreview() {
   const box = $('#thumb-preview');
+  if (previewObjectUrl) {
+    URL.revokeObjectURL(previewObjectUrl);
+    previewObjectUrl = null;
+  }
   if (editingThumbBlob) {
-    const url = URL.createObjectURL(editingThumbBlob);
-    box.innerHTML = `<img src="${url}" alt="" />`;
+    previewObjectUrl = URL.createObjectURL(editingThumbBlob);
+    box.innerHTML = `<img src="${escapeHtml(previewObjectUrl)}" alt="" />`;
   } else if (editing?.thumbnail && typeof editing.thumbnail === 'string') {
-    box.innerHTML = `<img src="${editing.thumbnail}" alt="" />`;
+    box.innerHTML = `<img src="${escapeHtml(editing.thumbnail)}" alt="" />`;
+  } else if (editing?.thumbnail instanceof Blob) {
+    box.innerHTML = `<img src="${escapeHtml(thumbObjectUrl(editing))}" alt="" />`;
   } else {
     box.innerHTML = iconSvg('image', { size: 28 });
   }
@@ -709,8 +774,8 @@ async function saveEditor() {
     seed: numOrNull($('#f-seed').value),
     steps: numOrNull($('#f-steps').value),
     cfg: numOrNull($('#f-cfg').value),
-    sampler: $('#f-sampler').value,
-    scheduler: $('#f-scheduler').value,
+    sampler: $('#f-sampler').value || editing.sampler || '',
+    scheduler: $('#f-scheduler').value || editing.scheduler || '',
     width: numOrNull($('#f-width').value),
     height: numOrNull($('#f-height').value),
     memo: $('#f-memo').value.trim(),
@@ -744,11 +809,8 @@ function openDetail(id) {
 
   let thumbHtml = '';
   if (p.thumbnail) {
-    const url =
-      typeof p.thumbnail === 'string'
-        ? p.thumbnail
-        : URL.createObjectURL(p.thumbnail);
-    thumbHtml = `<div class="thumb-preview" style="width:120px;height:120px;margin-bottom:12px"><img src="${url}" alt="" /></div>`;
+    const url = thumbObjectUrl(p);
+    thumbHtml = `<div class="thumb-preview" style="width:120px;height:120px;margin-bottom:12px"><img src="${escapeHtml(url)}" alt="" /></div>`;
   } else {
     const colors = promptArtColors(`${p.title || ''}|${p.positive || ''}|${p.id || ''}`);
     thumbHtml = `<div class="card-media" style="margin-bottom:12px;max-width:180px"><div class="card-media-frame" style="padding-bottom:${aspectPadding(p.width, p.height)}">${promptArtSvg(colors)}</div></div>`;
@@ -832,6 +894,10 @@ function confirmDelete(p) {
 }
 
 function openModal({ title, message, actions }) {
+  if (modalHideTimer) {
+    clearTimeout(modalHideTimer);
+    modalHideTimer = null;
+  }
   const modal = $('#modal');
   const overlay = $('#overlay');
   $('#modal-title').textContent = title;
@@ -852,19 +918,18 @@ function openModal({ title, message, actions }) {
     overlay.classList.add('is-open');
     modal.classList.add('is-open');
   });
+  document.body.style.overflow = 'hidden';
 }
 
 function closeModal() {
   const modal = $('#modal');
   modal.classList.remove('is-open');
-  setTimeout(() => {
+  if (modalHideTimer) clearTimeout(modalHideTimer);
+  modalHideTimer = setTimeout(() => {
+    modalHideTimer = null;
+    if (modal.classList.contains('is-open')) return;
     modal.hidden = true;
-    if (![...$$('.sheet')].some((s) => s.classList.contains('is-open'))) {
-      const overlay = $('#overlay');
-      overlay.classList.remove('is-open');
-      overlay.hidden = true;
-      document.body.style.overflow = '';
-    }
+    releaseOverlayIfIdle();
   }, 250);
 }
 
@@ -1023,7 +1088,7 @@ function applyBuilder() {
     qualityPosition: 'end',
     tagCategoryMap,
   });
-  if ($('#editor-sheet').classList.contains('is-open') || !$('#editor-sheet').hidden) {
+  if ($('#editor-sheet').classList.contains('is-open')) {
     $('#f-positive').value = pos;
     $('#f-negative').value = neg;
   } else {
@@ -1062,11 +1127,15 @@ async function doExport() {
   const blob = new Blob([JSON.stringify(data, null, 2)], {
     type: 'application/json',
   });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = url;
   a.download = `prompt-notebook-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);
+  a.remove();
+  // click 直後に revoke すると、Safari などではダウンロードが空になる
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
   toast('エクスポートしました');
 }
 
@@ -1165,6 +1234,9 @@ function bindEvents() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  $('#editor-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+  });
   $('#editor-close').onclick = () => closeSheet('editor-sheet');
   $('#editor-cancel').onclick = () => closeSheet('editor-sheet');
   $('#editor-save').onclick = () => saveEditor();
@@ -1222,6 +1294,7 @@ function bindEvents() {
     if (!detailPrompt) return;
     await toggleFavorite(detailPrompt, $('#detail-fav'));
     setIcon($('#detail-fav'), detailPrompt.favorite ? 'starFilled' : 'star');
+    $('#detail-fav').classList.toggle('is-active', detailPrompt.favorite);
   };
 
   let searchTimer;
