@@ -1663,4 +1663,9 @@ a {
     padding-bottom: 0 !important;
     height: clamp(150px, 42vw, 200px);
   }
+
+  /* 16px 未満だと iOS が入力時に画面を拡大し、戻らないことがある */
+  .mono-field {
+    font-size: 16px;
+  }
 }
